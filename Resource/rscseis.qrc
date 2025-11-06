@@ -1,0 +1,15 @@
+<RCC>
+  <qresource prefix="newPrefix">
+    <file>PortaSeis.png</file>
+    <file>PGA.png</file>
+    <file>PGV.png</file>
+    <file>PGD.png</file>
+    <file>Rollac.png</file>
+    <file>Rollang.png</file>
+    <file>Pitchang.png</file>
+    <file>Pitchac.png</file>
+    <file>scale.png</file>
+    <file>roll.png</file>
+    <file>pitch.png</file>\
+  </qresource>
+</RCC>

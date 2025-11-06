@@ -1,48 +1,40 @@
 #include <Wire.h>
-#include <Adafruit_Sensor.h>
-#include <Adafruit_MPU6050.h>
+#include <MPU6050.h>
 
-Adafruit_MPU6050 mpu;            // Object sensor Adafruit MPU6050
-const int buzzerPin = 25;        // Pin buzzer aktif di GPIO25 (ubah sesuai rangkaianmu)
-float threshold = 1.5;           // Ambang batas getaran (g)
+MPU6050 mpu;            // Object sensor MPU6050
+const int buzzerPin = 25; // Pin buzzer aktif di GPIO25 (ubah sesuai rangkaianmu)
+float threshold = 1.5;    // Ambang batas getaran (g)
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial) delay(10);
-
   Wire.begin();
-  if (!mpu.begin()) {
-    Serial.println("MPU6050 tidak terdeteksi ❌ (Adafruit MPU6050)");
-    while (1) delay(10); // Hentikan jika tidak terdeteksi
-  }
-
-  // (Opsional) konfigurasi sensor, bisa disesuaikan
-  // mpu.setAccelerometerRange(MPU6050_RANGE_4_G);
-  // mpu.setGyroRange(MPU6050_RANGE_500_DEG);
-  // mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  mpu.initialize();
 
   pinMode(buzzerPin, OUTPUT);
   digitalWrite(buzzerPin, LOW);
 
-  Serial.println("MPU6050 terdeteksi ✅ (Adafruit MPU6050)");
+  // Cek koneksi sensor
+  if (mpu.testConnection()) {
+    Serial.println("MPU6050 terdeteksi ✅");
+  } else {
+    Serial.println("MPU6050 tidak terdeteksi ❌");
+    while (1); // Hentikan jika tidak terdeteksi
+  }
+
   Serial.println("\n--- Sistem Seismograf Siap ---");
   Serial.println("Membaca getaran...");
 }
 
 void loop() {
-  sensors_event_t accel;
-  sensors_event_t gyro;
-  sensors_event_t temp;
+  int16_t ax, ay, az;
+  mpu.getAcceleration(&ax, &ay, &az);
 
-  // Ambil event sensor (acceleration dalam m/s^2)
-  mpu.getEvent(&accel, &gyro, &temp);
+  // Konversi ke g (1g = 9.81 m/s^2)
+  float Ax = ax / 16384.0;
+  float Ay = ay / 16384.0;
+  float Az = az / 16384.0;
 
-  // Konversi ke g (1 g = 9.80665 m/s^2)
-  float Ax = accel.acceleration.x / 9.80665;
-  float Ay = accel.acceleration.y / 9.80665;
-  float Az = accel.acceleration.z / 9.80665;
-
-  // Hitung besar getaran total (dalam g)
+  // Hitung besar getaran total
   float magnitude = sqrt(Ax * Ax + Ay * Ay + Az * Az);
 
   // Print ke Serial Monitor
@@ -68,4 +60,3 @@ void loop() {
 
   delay(200); // Delay pembacaan sensor
 }
-```

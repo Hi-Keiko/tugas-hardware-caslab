@@ -1,74 +1,62 @@
 #include <Wire.h>
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
-#include <LiquidCrystal_I2C.h>
+#include <MPU6050.h>
 
-Adafruit_MPU6050 mpu;
-LiquidCrystal_I2C lcd(0x27, 16, 2);  // Ubah alamat jika perlu
-const int buzzerPin = 13;
-float vibrationThreshold = 0.15;
+MPU6050 mpu;            // Object sensor MPU6050
+const int buzzerPin = 25; // Pin buzzer aktif di GPIO25 (ubah sesuai rangkaianmu)
+float threshold = 1.5;    // Ambang batas getaran (g)
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin(21, 22); // Satu bus I2C
-
-  // Inisialisasi LCD
-  lcd.begin(16, 2);
-  lcd.init();
-  lcd.backlight();
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Seismograf ESP32");
-
-  // Inisialisasi MPU6050
-  if (!mpu.begin(0x68, &Wire)) {
-    Serial.println("MPU6050 tidak terdeteksi!");
-    lcd.setCursor(0, 1);
-    lcd.print("MPU ERROR!");
-    while (1);
-  }
-
-  mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
-  mpu.setGyroRange(MPU6050_RANGE_250_DEG);
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  Wire.begin();
+  mpu.initialize();
 
   pinMode(buzzerPin, OUTPUT);
   digitalWrite(buzzerPin, LOW);
 
-  delay(1500);
-  lcd.clear();
+  // Cek koneksi sensor
+  if (mpu.testConnection()) {
+    Serial.println("MPU6050 terdeteksi ✅");
+  } else {
+    Serial.println("MPU6050 tidak terdeteksi ❌");
+    while (1); // Hentikan jika tidak terdeteksi
+  }
+
+  Serial.println("\n--- Sistem Seismograf Siap ---");
+  Serial.println("Membaca getaran...");
 }
 
 void loop() {
-  sensors_event_t accel, gyro, temp;
-  mpu.getEvent(&accel, &gyro, &temp);
+  int16_t ax, ay, az;
+  mpu.getAcceleration(&ax, &ay, &az);
 
-  float magnitude = sqrt(accel.acceleration.x * accel.acceleration.x +
-                         accel.acceleration.y * accel.acceleration.y +
-                         accel.acceleration.z * accel.acceleration.z) - 9.81;
-  if (magnitude < 0) magnitude = -magnitude;
+  // Konversi ke g (1g = 9.81 m/s^2)
+  float Ax = ax / 16384.0;
+  float Ay = ay / 16384.0;
+  float Az = az / 16384.0;
 
-  float magnitude_g = magnitude / 9.81;
+  // Hitung besar getaran total
+  float magnitude = sqrt(Ax * Ax + Ay * Ay + Az * Az);
 
-  Serial.print("Getaran: ");
-  Serial.print(magnitude_g, 3);
-  Serial.println(" g");
+  // Print ke Serial Monitor
+  Serial.print("Getaran (g): ");
+  Serial.print(magnitude, 3);
 
-  lcd.setCursor(0, 0);
-  lcd.print("Getaran: ");
-  lcd.print(magnitude_g, 2);
-  lcd.print("g   ");
+  // Klasifikasi sederhana skala getaran
+  String skala;
+  if (magnitude < 1.05) skala = "Stabil";
+  else if (magnitude < 1.2) skala = "Getaran ringan";
+  else if (magnitude < 1.5) skala = "Getaran sedang";
+  else skala = "Getaran kuat ⚠️";
 
-  lcd.setCursor(0, 1);
-  if (magnitude_g < vibrationThreshold)
-    lcd.print("Tenang          ");
-  else if (magnitude_g < 0.4)
-    lcd.print("Getaran Ringan  ");
-  else if (magnitude_g < 0.8)
-    lcd.print("Getaran Sedang  ");
-  else
-    lcd.print("Getaran Kuat!!! ");
+  Serial.print(" | Skala: ");
+  Serial.println(skala);
 
-  digitalWrite(buzzerPin, magnitude_g > 0.6 ? HIGH : LOW);
-  delay(200);
+  // Aktifkan buzzer jika melewati threshold
+  if (magnitude > threshold) {
+    digitalWrite(buzzerPin, HIGH);
+    delay(100);
+    digitalWrite(buzzerPin, LOW);
+  }
+
+  delay(200); // Delay pembacaan sensor
 }

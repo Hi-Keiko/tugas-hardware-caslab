@@ -21,8 +21,8 @@ class Dashboard(QMainWindow):
         self.showMaximized()
 
         #UNTUK ROLL ACCELERATION=====
-        self.SERIAL_PORT = 'COM3'  # Contoh: 'COM3' (Windows) atau '/dev/ttyACM0' (Linux/macOS)
-        self.BAUD_RATE = 9600 # Sesuaikan
+        self.SERIAL_PORT = 'COM7'  # Contoh: 'COM3' (Windows) atau '/dev/ttyACM0' (Linux/macOS)
+        self.BAUD_RATE = 115200 # Sesuaikan
         self.serial_connection = None
 
         self.MAX_POINTS = 500  # Maksimum titik yang ditampilkan pada grafik

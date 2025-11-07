@@ -1,28 +1,42 @@
+#include <Arduino.h>
 #include <Wire.h>
 #include <MPU6050.h>
+#include <LiquidCrystal.h>
+
+LiquidCrystal lcd(14, 27, 26, 25, 33, 32);
 
 MPU6050 mpu;            // Object sensor MPU6050
-const int buzzerPin = 25; // Pin buzzer aktif di GPIO25 (ubah sesuai rangkaianmu)
-float threshold = 1.5;    // Ambang batas getaran (g)
+const int buzzerPin = 4; // Pin buzzer aktif di GPIO25 (ubah sesuai rangkaianmu)
+float threshold = 1.1;    // Ambang batas getaran (g)
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin();
+  Wire.begin(18,19);
+  delay(100);
   mpu.initialize();
 
   pinMode(buzzerPin, OUTPUT);
   digitalWrite(buzzerPin, LOW);
 
-  // Cek koneksi sensor
-  if (mpu.testConnection()) {
-    Serial.println("MPU6050 terdeteksi ✅");
-  } else {
-    Serial.println("MPU6050 tidak terdeteksi ❌");
-    while (1); // Hentikan jika tidak terdeteksi
-  }
+  lcd.begin(16, 2);
+  lcd.print("Initializing...");
 
-  Serial.println("\n--- Sistem Seismograf Siap ---");
-  Serial.println("Membaca getaran...");
+  // Cek koneksi sensor
+  // if (mpu.testConnection()) {
+  //   Serial.println("MPU6050 terdeteksi ✅");
+  // } else {
+  //   Serial.println("MPU6050 tidak terdeteksi ❌");
+  //   while (1); // Hentikan jika tidak terdeteksi
+  // }
+
+  // Serial.println("\n--- Sistem Seismograf Siap ---");
+  // Serial.println("Membaca getaran...");
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("MPU Ready");
+  delay(1000);
+  lcd.clear();
 }
 
 void loop() {
@@ -38,8 +52,8 @@ void loop() {
   float magnitude = sqrt(Ax * Ax + Ay * Ay + Az * Az);
 
   // Print ke Serial Monitor
-  Serial.print("Getaran (g): ");
-  Serial.print(magnitude, 3);
+  // Serial.print("Getaran (g): ");
+  Serial.println(magnitude, 3);
 
   // Klasifikasi sederhana skala getaran
   String skala;
@@ -48,8 +62,16 @@ void loop() {
   else if (magnitude < 1.5) skala = "Getaran sedang";
   else skala = "Getaran kuat ⚠️";
 
-  Serial.print(" | Skala: ");
-  Serial.println(skala);
+  // Serial.print(" | Skala: ");
+  // Serial.println(skala);
+
+  lcd.setCursor(0, 0);
+  lcd.print("Getaran:         ");
+  lcd.setCursor(8, 0);
+  lcd.print("    "); // clear previous digits
+  lcd.setCursor(8, 0);
+  lcd.print((float)magnitude); // show whole number only
+  // lcd.print((char)223); // degree symbol
 
   // Aktifkan buzzer jika melewati threshold
   if (magnitude > threshold) {

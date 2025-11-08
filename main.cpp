@@ -2,12 +2,17 @@
 #include <Wire.h>
 #include <MPU6050.h>
 #include <LiquidCrystal.h>
+#include <math.h>
 
 LiquidCrystal lcd(14, 27, 26, 25, 33, 32);
 
 MPU6050 mpu;            // Object sensor MPU6050
 const int buzzerPin = 4; // Pin buzzer aktif di GPIO25 (ubah sesuai rangkaianmu)
 float threshold = 1.1;    // Ambang batas getaran (g)
+const float PI_VAL = 3.14159265359;
+
+float smoothedAngle = 0;
+float alpha = 0.1;
 
 void setup() {
   Serial.begin(115200);
@@ -40,6 +45,8 @@ void setup() {
 }
 
 void loop() {
+
+
   int16_t ax, ay, az;
   mpu.getAcceleration(&ax, &ay, &az);
 
@@ -48,12 +55,23 @@ void loop() {
   float Ay = ay / 16384.0;
   float Az = az / 16384.0;
 
+  float RollAngle = atan2(ay, az) * 180 / PI_VAL;
+  float PitchAngle = atan2(-ax, sqrt(ay*ay + az*az)) * 180 / PI_VAL;
+
+
+
   // Hitung besar getaran total
   float magnitude = sqrt(Ax * Ax + Ay * Ay + Az * Az);
 
   // Print ke Serial Monitor
   // Serial.print("Getaran (g): ");
-  Serial.println(magnitude, 3);
+  Serial.print(Ax, 3);
+  Serial.print(",");
+  Serial.print(Ay, 3);
+  Serial.print(",");
+  Serial.print(RollAngle, 2);
+  Serial.print(",");
+  Serial.println(PitchAngle, 2);
 
   // Klasifikasi sederhana skala getaran
   String skala;

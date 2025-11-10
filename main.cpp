@@ -25,6 +25,7 @@ void setup() {
 
   lcd.begin(16, 2);
   lcd.print("Initializing...");
+  delay(1000);
 
   // Cek koneksi sensor
   // if (mpu.testConnection()) {
@@ -71,7 +72,11 @@ void loop() {
   Serial.print(",");
   Serial.print(RollAngle, 2);
   Serial.print(",");
-  Serial.println(PitchAngle, 2);
+  Serial.print(PitchAngle, 2);
+  Serial.print(",");
+  Serial.println(Az, 2);
+
+
 
   // Klasifikasi sederhana skala getaran
   String skala;

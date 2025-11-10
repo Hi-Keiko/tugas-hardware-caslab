@@ -16,7 +16,7 @@ float alpha = 0.1;
 
 void setup() {
   Serial.begin(115200);
-  Wire.begin(18,19);
+  Wire.begin();
   delay(100);
   mpu.initialize();
 
@@ -72,9 +72,9 @@ void loop() {
   Serial.print(",");
   Serial.print(RollAngle, 2);
   Serial.print(",");
-  Serial.print(PitchAngle, 2);
-  Serial.print(",");
-  Serial.println(Az, 2);
+  Serial.println(PitchAngle, 2);
+  /* Serial.print(",");
+  Serial.println(Az, 2); */
 
 
 

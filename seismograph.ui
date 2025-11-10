@@ -30,10 +30,10 @@
        <string notr="true">image: url(:/newPrefix/PortaSeis.png)</string>
       </property>
       <property name="frameShape">
-       <enum>QFrame::NoFrame</enum>
+       <enum>QFrame::StyledPanel</enum>
       </property>
       <property name="frameShadow">
-       <enum>QFrame::Plain</enum>
+       <enum>QFrame::Raised</enum>
       </property>
      </widget>
     </item>
@@ -46,10 +46,10 @@
        </sizepolicy>
       </property>
       <property name="frameShape">
-       <enum>QFrame::NoFrame</enum>
+       <enum>QFrame::StyledPanel</enum>
       </property>
       <property name="frameShadow">
-       <enum>QFrame::Plain</enum>
+       <enum>QFrame::Raised</enum>
       </property>
       <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="1,1,1">
        <item>
@@ -61,14 +61,14 @@
           </sizepolicy>
          </property>
          <property name="frameShape">
-          <enum>QFrame::NoFrame</enum>
+          <enum>QFrame::StyledPanel</enum>
          </property>
          <property name="frameShadow">
-          <enum>QFrame::Plain</enum>
+          <enum>QFrame::Raised</enum>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_2" stretch="1,3,1,3">
           <item>
-           <widget class="QLabel" name="label_rollac">
+           <widget class="QFrame" name="frame_9">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
               <horstretch>0</horstretch>
@@ -76,13 +76,13 @@
              </sizepolicy>
             </property>
             <property name="styleSheet">
-             <string notr="true">color: rgb(100, 200, 100); font-size: 22px; font-weight: bold; font-family: Arial, sans-serif;</string>
+             <string notr="true">image: url(:/newPrefix/Rollac.png)</string>
             </property>
-            <property name="text">
-             <string>ROLL ACCELERATION</string>
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
             </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+            <property name="frameShadow">
+             <enum>QFrame::Raised</enum>
             </property>
            </widget>
           </item>
@@ -100,7 +100,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLabel" name="label_pitchac">
+           <widget class="QFrame" name="frame_10">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
               <horstretch>0</horstretch>
@@ -108,13 +108,13 @@
              </sizepolicy>
             </property>
             <property name="styleSheet">
-             <string notr="true">color: rgb(100, 200, 100); font-size: 22px; font-weight: bold; font-family: Arial, sans-serif;</string>
+             <string notr="true">image: url(:/newPrefix/Pitchac.png)</string>
             </property>
-            <property name="text">
-             <string>PITCH ACCELERATION</string>
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
             </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+            <property name="frameShadow">
+             <enum>QFrame::Raised</enum>
             </property>
            </widget>
           </item>
@@ -143,14 +143,14 @@
           </sizepolicy>
          </property>
          <property name="frameShape">
-          <enum>QFrame::NoFrame</enum>
+          <enum>QFrame::StyledPanel</enum>
          </property>
          <property name="frameShadow">
-          <enum>QFrame::Plain</enum>
+          <enum>QFrame::Raised</enum>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_3" stretch="1,3,1,3">
           <item>
-           <widget class="QLabel" name="label_rollang">
+           <widget class="QFrame" name="frame_11">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
               <horstretch>0</horstretch>
@@ -158,13 +158,13 @@
              </sizepolicy>
             </property>
             <property name="styleSheet">
-             <string notr="true">color: rgb(100, 200, 100); font-size: 22px; font-weight: bold; font-family: Arial, sans-serif;</string>
+             <string notr="true">image: url(:/newPrefix/Rollang.png)</string>
             </property>
-            <property name="text">
-             <string>ROLL ANGLE</string>
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
             </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+            <property name="frameShadow">
+             <enum>QFrame::Raised</enum>
             </property>
            </widget>
           </item>
@@ -182,7 +182,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QLabel" name="label_pitchang">
+           <widget class="QFrame" name="frame_12">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
               <horstretch>0</horstretch>
@@ -190,13 +190,13 @@
              </sizepolicy>
             </property>
             <property name="styleSheet">
-             <string notr="true">color: rgb(100, 200, 100); font-size: 22px; font-weight: bold; font-family: Arial, sans-serif;</string>
+             <string notr="true">image: url(:/newPrefix/Pitchang.png)</string>
             </property>
-            <property name="text">
-             <string>PITCH ANGLE</string>
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
             </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+            <property name="frameShadow">
+             <enum>QFrame::Raised</enum>
             </property>
            </widget>
           </item>
@@ -225,14 +225,14 @@
           </sizepolicy>
          </property>
          <property name="frameShape">
-          <enum>QFrame::NoFrame</enum>
+          <enum>QFrame::StyledPanel</enum>
          </property>
          <property name="frameShadow">
-          <enum>QFrame::Plain</enum>
+          <enum>QFrame::Raised</enum>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_7" stretch="2,6,1">
           <item>
-           <widget class="QLabel" name="label_yawac">
+           <widget class="QFrame" name="frame_30">
             <property name="sizePolicy">
              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
               <horstretch>0</horstretch>
@@ -240,13 +240,13 @@
              </sizepolicy>
             </property>
             <property name="styleSheet">
-             <string notr="true">color: rgb(100, 200, 100); font-size: 22px; font-weight: bold; font-family: Arial, sans-serif;</string>
+             <string notr="true">image: url(:/newPrefix/Yawac.png)</string>
             </property>
-            <property name="text">
-             <string>YAW/VERTICAL ACCELERATION</string>
+            <property name="frameShape">
+             <enum>QFrame::StyledPanel</enum>
             </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
+            <property name="frameShadow">
+             <enum>QFrame::Raised</enum>
             </property>
            </widget>
           </item>
@@ -291,14 +291,14 @@
        </sizepolicy>
       </property>
       <property name="frameShape">
-       <enum>QFrame::NoFrame</enum>
+       <enum>QFrame::StyledPanel</enum>
       </property>
       <property name="frameShadow">
-       <enum>QFrame::Plain</enum>
+       <enum>QFrame::Raised</enum>
       </property>
       <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="1,1,1,1,1,1,1,2">
        <item>
-        <widget class="QLabel" name="label_pga">
+        <widget class="QFrame" name="frame_13">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
            <horstretch>0</horstretch>
@@ -306,13 +306,13 @@
           </sizepolicy>
          </property>
          <property name="styleSheet">
-          <string notr="true">color: rgb(255, 255, 255); font-size: 24px; font-weight: bold; font-family: Arial, sans-serif;</string>
+          <string notr="true">image: url(:/newPrefix/PGA.png)</string>
          </property>
-         <property name="text">
-          <string>PGA</string>
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
          </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
          </property>
         </widget>
        </item>
@@ -330,7 +330,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QLabel" name="label_pgv">
+        <widget class="QFrame" name="frame_14">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
            <horstretch>0</horstretch>
@@ -338,13 +338,13 @@
           </sizepolicy>
          </property>
          <property name="styleSheet">
-          <string notr="true">color: rgb(255, 255, 255); font-size: 24px; font-weight: bold; font-family: Arial, sans-serif;</string>
+          <string notr="true">image: url(:/newPrefix/PGV.png)</string>
          </property>
-         <property name="text">
-          <string>PGV</string>
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
          </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
          </property>
         </widget>
        </item>
@@ -362,7 +362,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QLabel" name="label_pgd">
+        <widget class="QFrame" name="frame_18">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
            <horstretch>0</horstretch>
@@ -370,13 +370,13 @@
           </sizepolicy>
          </property>
          <property name="styleSheet">
-          <string notr="true">color: rgb(255, 255, 255); font-size: 24px; font-weight: bold; font-family: Arial, sans-serif;</string>
+          <string notr="true">image: url(:/newPrefix/PGD.png)</string>
          </property>
-         <property name="text">
-          <string>PGD</string>
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
          </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
          </property>
         </widget>
        </item>
@@ -394,7 +394,7 @@
         </widget>
        </item>
        <item>
-        <widget class="QLabel" name="label_scale">
+        <widget class="QFrame" name="frame_22">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
            <horstretch>0</horstretch>
@@ -402,13 +402,13 @@
           </sizepolicy>
          </property>
          <property name="styleSheet">
-          <string notr="true">color: rgb(100, 200, 100); font-size: 24px; font-weight: bold; font-family: Arial, sans-serif;</string>
+          <string notr="true">image: url(:/newPrefix/scale.png)</string>
          </property>
-         <property name="text">
-          <string>SCALE</string>
+         <property name="frameShape">
+          <enum>QFrame::StyledPanel</enum>
          </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
+         <property name="frameShadow">
+          <enum>QFrame::Raised</enum>
          </property>
         </widget>
        </item>

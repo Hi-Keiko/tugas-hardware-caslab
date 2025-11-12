@@ -220,6 +220,8 @@ class Dashboard(QMainWindow):
         self.mmi_label = setup_value_display('mmi', "MMI (Modified Mercalli Intensity)", self.current_mmi, "MMI", decimal_places=1)
 
 
+        # Setup buzzer control buttons
+        self.setup_buzzer_controls()
 
         self.setup_serial()
 
@@ -251,6 +253,71 @@ class Dashboard(QMainWindow):
             msg.setText("Gagal Koneksi Serial")
             msg.setInformativeText(f"Pastikan perangkat terhubung dan port '{self.SERIAL_PORT}' benar.\nError: {e}")
             msg.setWindowTitle("Error Serial")
+            msg.exec_()
+
+
+    def setup_buzzer_controls(self):
+        """Setup button connections untuk kontrol buzzer"""
+        # Buzzer 1
+        self.btn_buzzer1_on = self.findChild(QPushButton, 'btn_buzzer1_on')
+        self.btn_buzzer1_off = self.findChild(QPushButton, 'btn_buzzer1_off')
+        
+        # Buzzer 2
+        self.btn_buzzer2_on = self.findChild(QPushButton, 'btn_buzzer2_on')
+        self.btn_buzzer2_off = self.findChild(QPushButton, 'btn_buzzer2_off')
+        
+        # Buzzer 3
+        self.btn_buzzer3_on = self.findChild(QPushButton, 'btn_buzzer3_on')
+        self.btn_buzzer3_off = self.findChild(QPushButton, 'btn_buzzer3_off')
+        
+        # Connect buttons to functions
+        if self.btn_buzzer1_on:
+            self.btn_buzzer1_on.clicked.connect(lambda: self.control_buzzer(1, True))
+        if self.btn_buzzer1_off:
+            self.btn_buzzer1_off.clicked.connect(lambda: self.control_buzzer(1, False))
+            
+        if self.btn_buzzer2_on:
+            self.btn_buzzer2_on.clicked.connect(lambda: self.control_buzzer(2, True))
+        if self.btn_buzzer2_off:
+            self.btn_buzzer2_off.clicked.connect(lambda: self.control_buzzer(2, False))
+            
+        if self.btn_buzzer3_on:
+            self.btn_buzzer3_on.clicked.connect(lambda: self.control_buzzer(3, True))
+        if self.btn_buzzer3_off:
+            self.btn_buzzer3_off.clicked.connect(lambda: self.control_buzzer(3, False))
+
+
+    def control_buzzer(self, buzzer_num, state):
+        """
+        Mengirim perintah untuk mengontrol buzzer ke ESP
+        buzzer_num: 1, 2, atau 3
+        state: True (ON) atau False (OFF)
+        """
+        if not self.serial_connection or not self.serial_connection.isOpen():
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Warning)
+            msg.setText("Koneksi Serial Tidak Tersedia")
+            msg.setInformativeText("Pastikan ESP terhubung dan koneksi serial aktif.")
+            msg.setWindowTitle("Peringatan")
+            msg.exec_()
+            return
+        
+        try:
+            # Format perintah: BUZ<nomor>,<state>
+            # Contoh: BUZ1,1 (buzzer 1 ON), BUZ2,0 (buzzer 2 OFF)
+            command = f"BUZ{buzzer_num},{1 if state else 0}\n"
+            self.serial_connection.write(command.encode('utf-8'))
+            
+            status_text = "ON" if state else "OFF"
+            print(f"Perintah dikirim: Buzzer {buzzer_num} -> {status_text}")
+            
+        except Exception as e:
+            print(f"Error saat mengirim perintah buzzer: {e}")
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Critical)
+            msg.setText("Error Mengirim Perintah")
+            msg.setInformativeText(f"Gagal mengirim perintah ke ESP.\nError: {e}")
+            msg.setWindowTitle("Error")
             msg.exec_()
 
 

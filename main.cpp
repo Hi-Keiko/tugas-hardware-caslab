@@ -3,15 +3,6 @@
 #include <MPU6050.h>
 #include <LiquidCrystal.h>
 #include <math.h>
-#include <WiFi.h>
-
-// Konfigurasi WiFi - GANTI SESUAI KEBUTUHAN
-const char* ssid = "ESP32_Seismograph";     // Nama WiFi Access Point
-const char* password = "12345678";          // Password WiFi (min 8 karakter)
-
-// Konfigurasi Server
-WiFiServer server(8888);  // Port untuk komunikasi
-WiFiClient client;
 
 LiquidCrystal lcd(14, 27, 26, 25, 33, 32);
 
@@ -29,19 +20,14 @@ const float PI_VAL = 3.14159265359;
 float smoothedAngle = 0;
 float alpha = 0.1;
 
-// Buffer untuk membaca perintah dari client
-String wifiCommand = "";
+// Buffer untuk membaca perintah serial
+String serialCommand = "";
 
 // Deklarasi fungsi
 void processCommand(String command);
-void setupWiFi();
 
 void setup() {
   Serial.begin(115200);
-  
-  // Setup WiFi
-  setupWiFi();
-  
   Wire.begin();
   delay(100);
   mpu.initialize();
@@ -60,8 +46,9 @@ void setup() {
   digitalWrite(buzzer3Pin, LOW);
 
   lcd.begin(16, 2);
-  lcd.print("WiFi Ready!");
-  delay(2000);
+  lcd.print("Initializing...");
+  delay(1000);
+
 
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -70,56 +57,18 @@ void setup() {
   lcd.clear();
 }
 
-void setupWiFi() {
-  Serial.println("Starting WiFi Access Point...");
-  
-  // Mode: Access Point (ESP32 sebagai WiFi hotspot)
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(ssid, password);
-  
-  IPAddress IP = WiFi.softAPIP();
-  Serial.print("AP IP address: ");
-  Serial.println(IP);
-  
-  // Tampilkan IP di LCD
-  lcd.begin(16, 2);
-  lcd.print("WiFi AP Ready");
-  lcd.setCursor(0, 1);
-  lcd.print(IP);
-  delay(3000);
-  
-  // Start server
-  server.begin();
-  Serial.println("Server started on port 8888");
-  Serial.println("Waiting for client connection...");
-}
-
 void loop() {
 
-  // Cek koneksi client
-  if (!client.connected()) {
-    client = server.available();
-    if (client) {
-      Serial.println("New client connected!");
-      lcd.clear();
-      lcd.print("Client Connect!");
-      delay(1000);
-      lcd.clear();
-    }
-  }
-
-  // Cek apakah ada perintah dari WiFi client
-  if (client && client.connected()) {
-    while (client.available() > 0) {
-      char inChar = (char)client.read();
-      
-      if (inChar == '\n') {
-        // Proses perintah yang diterima
-        processCommand(wifiCommand);
-        wifiCommand = ""; // Reset buffer
-      } else {
-        wifiCommand += inChar;
-      }
+  // Cek apakah ada perintah dari serial (dari UI Python)
+  while (Serial.available() > 0) {
+    char inChar = (char)Serial.read();
+    
+    if (inChar == '\n') {
+      // Proses perintah yang diterima
+      processCommand(serialCommand);
+      serialCommand = ""; // Reset buffer
+    } else {
+      serialCommand += inChar;
     }
   }
 
@@ -136,20 +85,7 @@ void loop() {
 
   float magnitude = sqrt(Ax * Ax + Ay * Ay + Az * Az);
 
-  // Kirim data ke client via WiFi (jika terhubung)
-  if (client && client.connected()) {
-    client.print(Ax, 3);
-    client.print(",");
-    client.print(Ay, 3);
-    client.print(",");
-    client.print(RollAngle, 2);
-    client.print(",");
-    client.print(PitchAngle, 2);
-    client.print(",");
-    client.println(Az, 2);
-  }
 
-  // Tetap kirim ke Serial untuk debugging
   Serial.print(Ax, 3);
   Serial.print(",");
   Serial.print(Ay, 3);
@@ -208,35 +144,20 @@ void processCommand(String command) {
       switch(buzzerNum) {
         case 1:
           digitalWrite(buzzer1Pin, state == 1 ? HIGH : LOW);
-          if (client && client.connected()) {
-            client.print("Buzzer 1 ");
-            client.println(state == 1 ? "ON" : "OFF");
-          }
           Serial.print("Buzzer 1 ");
           Serial.println(state == 1 ? "ON" : "OFF");
           break;
         case 2:
           digitalWrite(buzzer2Pin, state == 1 ? HIGH : LOW);
-          if (client && client.connected()) {
-            client.print("Buzzer 2 ");
-            client.println(state == 1 ? "ON" : "OFF");
-          }
           Serial.print("Buzzer 2 ");
           Serial.println(state == 1 ? "ON" : "OFF");
           break;
         case 3:
           digitalWrite(buzzer3Pin, state == 1 ? HIGH : LOW);
-          if (client && client.connected()) {
-            client.print("Buzzer 3 ");
-            client.println(state == 1 ? "ON" : "OFF");
-          }
           Serial.print("Buzzer 3 ");
           Serial.println(state == 1 ? "ON" : "OFF");
           break;
         default:
-          if (client && client.connected()) {
-            client.println("Error: Buzzer number invalid");
-          }
           Serial.println("Error: Buzzer number invalid");
           break;
       }

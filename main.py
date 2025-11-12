@@ -2,6 +2,8 @@ import sys
 import numpy as np
 import os
 import math
+import socket
+import threading
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QMessageBox, QPushButton
 from PyQt5.uic import loadUi
@@ -10,7 +12,6 @@ from PyQt5.QtGui import QFont, QPixmap
 from PyQt5 import QtCore
 
 import pyqtgraph as pg
-import serial
 import time
 
 from Resource import rscseis
@@ -23,27 +24,14 @@ class Dashboard(QMainWindow):
         loadUi("seismograph.ui", self)
         self.showMaximized()
 
-        # KONFIGURASI KONEKSI
-        # Untuk Bluetooth: Ganti dengan address Bluetooth ESP32 Anda
-        # Format macOS: '/dev/tty.ESP32_Seismograph'
-        # Format Windows: 'COM10' (atau port Bluetooth yang ter-assign)
-        # Format Linux: '/dev/rfcomm0' atau cari dengan 'hcitool scan'
-        
-        self.USE_BLUETOOTH = True  # Set True untuk Bluetooth, False untuk USB Serial
-        
-        if self.USE_BLUETOOTH:
-            # Untuk macOS
-            self.SERIAL_PORT = '/dev/tty.ESP32_Seismograph'
-            # Untuk Windows, gunakan port COM yang ter-assign setelah pairing
-            # self.SERIAL_PORT = 'COM10'
-            # Untuk Linux
-            # self.SERIAL_PORT = '/dev/rfcomm0'
-        else:
-            # Untuk USB Serial
-            self.SERIAL_PORT = 'COM10'
-            
-        self.BAUD_RATE = 115200
-        self.serial_connection = None
+
+        # Konfigurasi WiFi - GANTI IP SESUAI ESP32
+        self.ESP32_IP = '192.168.4.1'  # IP default ESP32 Access Point
+        self.ESP32_PORT = 8888
+        self.wifi_socket = None
+        self.wifi_connected = False
+        self.receive_thread = None
+        self.running = True
 
 
         self.MAX_POINTS = 500  # Maksimum titik yang ditampilkan pada grafik
@@ -240,7 +228,7 @@ class Dashboard(QMainWindow):
         # Setup buzzer control buttons
         self.setup_buzzer_controls()
 
-        self.setup_serial()
+        self.setup_wifi()
 
 
         self.timer = QtCore.QTimer()
@@ -249,30 +237,74 @@ class Dashboard(QMainWindow):
         self.timer.start()
 
 
-
-    def setup_serial(self):
-
-        #Koneksi port ke serial/Bluetooth
+    def setup_wifi(self):
+        """Koneksi ke ESP32 via WiFi"""
         try:
-            self.serial_connection = serial.Serial(
-                self.SERIAL_PORT,
-                self.BAUD_RATE,
-                timeout=0.1 # Non-blocking read (waktu tunggu sangat singkat)
-            )
-            connection_type = "Bluetooth" if self.USE_BLUETOOTH else "USB Serial"
-            print(f"Koneksi {connection_type} berhasil di {self.SERIAL_PORT} @ {self.BAUD_RATE} bps")
-        except serial.SerialException as e:
-            print(f"Gagal membuka port serial {self.SERIAL_PORT}: {e}")
-            self.serial_connection = None
-            # Tampilkan pesan error ke pengguna
+            self.wifi_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.wifi_socket.settimeout(5)  # Timeout 5 detik
+            
+            print(f"Mencoba koneksi ke ESP32 di {self.ESP32_IP}:{self.ESP32_PORT}...")
+            self.wifi_socket.connect((self.ESP32_IP, self.ESP32_PORT))
+            self.wifi_connected = True
+            print(f"Koneksi WiFi berhasil ke ESP32!")
+            
+            # Start thread untuk menerima data
+            self.receive_thread = threading.Thread(target=self.receive_data, daemon=True)
+            self.receive_thread.start()
+            
+        except socket.timeout:
+            print(f"Timeout: Tidak dapat terhubung ke ESP32")
+            self.wifi_connected = False
+            self.show_connection_error("Timeout koneksi ke ESP32. Pastikan ESP32 menyala dan WiFi aktif.")
+        except socket.error as e:
+            print(f"Gagal koneksi WiFi ke ESP32: {e}")
+            self.wifi_connected = False
+            self.show_connection_error(f"Gagal koneksi ke ESP32.\nPastikan:\n1. ESP32 sudah menyala\n2. Terhubung ke WiFi 'ESP32_Seismograph'\n3. IP ESP32 benar: {self.ESP32_IP}\n\nError: {e}")
 
-            msg = QMessageBox()
-            msg.setIcon(QMessageBox.Critical)
-            msg.setText("Gagal Koneksi Serial/Bluetooth")
-            msg.setInformativeText(f"Pastikan perangkat terhubung dan port '{self.SERIAL_PORT}' benar.\n\nUntuk Bluetooth:\n- Pastikan ESP32 sudah di-pairing\n- Periksa nama port Bluetooth\n- macOS: /dev/tty.ESP32_Seismograph\n- Windows: COM port yang ter-assign\n- Linux: /dev/rfcomm0\n\nError: {e}")
-            msg.setWindowTitle("Error Koneksi")
-            msg.exec_()
 
+    def show_connection_error(self, message):
+        """Tampilkan pesan error koneksi"""
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Critical)
+        msg.setText("Gagal Koneksi WiFi")
+        msg.setInformativeText(message)
+        msg.setWindowTitle("Error WiFi")
+        msg.exec_()
+
+
+    def receive_data(self):
+        """Thread untuk menerima data dari ESP32"""
+        buffer = ""
+        while self.running and self.wifi_connected:
+            try:
+                if self.wifi_socket:
+                    data = self.wifi_socket.recv(1024).decode('utf-8')
+                    if data:
+                        buffer += data
+                        # Proses data per baris
+                        while '\n' in buffer:
+                            line, buffer = buffer.split('\n', 1)
+                            if line.strip():
+                                self.process_data_line(line.strip())
+                    else:
+                        # Koneksi terputus
+                        print("Koneksi ke ESP32 terputus")
+                        self.wifi_connected = False
+                        break
+            except socket.timeout:
+                continue
+            except Exception as e:
+                print(f"Error saat menerima data: {e}")
+                self.wifi_connected = False
+                break
+
+
+    def process_data_line(self, line):
+        """Proses satu baris data dari ESP32"""
+        # Simpan data ke buffer untuk diproses oleh update_plot
+        if not hasattr(self, 'data_buffer'):
+            self.data_buffer = []
+        self.data_buffer.append(line)
 
 
     def setup_buzzer_controls(self):
@@ -312,11 +344,11 @@ class Dashboard(QMainWindow):
         buzzer_num: 1, 2, atau 3
         state: True (ON) atau False (OFF)
         """
-        if not self.serial_connection or not self.serial_connection.isOpen():
+        if not self.wifi_connected or not self.wifi_socket:
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Warning)
-            msg.setText("Koneksi Serial Tidak Tersedia")
-            msg.setInformativeText("Pastikan ESP terhubung dan koneksi serial aktif.")
+            msg.setText("Koneksi WiFi Tidak Tersedia")
+            msg.setInformativeText("Pastikan ESP32 terhubung dan koneksi WiFi aktif.")
             msg.setWindowTitle("Peringatan")
             msg.exec_()
             return
@@ -325,7 +357,7 @@ class Dashboard(QMainWindow):
             # Format perintah: BUZ<nomor>,<state>
             # Contoh: BUZ1,1 (buzzer 1 ON), BUZ2,0 (buzzer 2 OFF)
             command = f"BUZ{buzzer_num},{1 if state else 0}\n"
-            self.serial_connection.write(command.encode('utf-8'))
+            self.wifi_socket.sendall(command.encode('utf-8'))
             
             status_text = "ON" if state else "OFF"
             print(f"Perintah dikirim: Buzzer {buzzer_num} -> {status_text}")
@@ -371,121 +403,109 @@ class Dashboard(QMainWindow):
 
     def update_plot(self):
         #untuk updating plot
-        if self.serial_connection and self.serial_connection.isOpen():
+        if not hasattr(self, 'data_buffer'):
+            self.data_buffer = []
+            
+        # Proses semua data yang ada di buffer
+        while len(self.data_buffer) > 0:
+            line = self.data_buffer.pop(0)
+            
+            if line:
+                data_parts = line.split(',')
+
+                if len(data_parts) == 5:
+
+                    try:
+                        new_roll_accel = float(data_parts[0])    # Data 1: Ax
+                        new_pitch_accel = float(data_parts[1])   # Data 2: Ay
+                        new_roll_angle = float(data_parts[2])    # Data 3: Roll Angle
+                        new_pitch_angle = float(data_parts[3])   # Data 4: Pitch Angle
+                        new_yaw_accel = float(data_parts[4])   # Data 5: Az
+
+                        detrended_yaw_accel = new_yaw_accel - self.STATIC_BIAS
+
+                        # Update data
+
+                        # 1. Roll Accel
+                        self.roll_data[:-1] = self.roll_data[1:]
+                        self.roll_data[-1] = new_roll_accel
+
+                        # 2. Pitch Accel
+                        self.pitch_data[:-1] = self.pitch_data[1:]
+                        self.pitch_data[-1] = new_pitch_accel
+
+                        # 3. Roll Angle
+                        self.roll_angle_data[:-1] = self.roll_angle_data[1:]
+                        self.roll_angle_data[-1] = new_roll_angle
+
+                        # 4. Pitch Angle
+                        self.pitch_angle_data[:-1] = self.pitch_angle_data[1:]
+                        self.pitch_angle_data[-1] = new_pitch_angle
+
+                        # 5. Yaw Accel
+                        self.yaw_data[:-1] = self.yaw_data[1:]
+                        self.yaw_data[-1] = detrended_yaw_accel
+
+                        self.rollacc_curve.setData(self.time_data, self.roll_data)
+                        self.pitchacc_curve.setData(self.time_data, self.pitch_data)
+                        self.rollangle_curve.setData(self.time_data, self.roll_angle_data)
+                        self.pitchangle_curve.setData(self.time_data, self.pitch_angle_data)
+                        self.yawacc_curve.setData(self.time_data, self.yaw_data)
+
+                        total_acc = math.sqrt(new_roll_accel**2 + new_pitch_accel**2 + new_yaw_accel**2)
+                        ground_accel = abs(total_acc - 1.0)
+
+                        self.peak_pga_window = max(self.peak_pga_window, ground_accel)
+
+                        #integrasi PGV
+                        self.current_vel += ground_accel * self.DT
+                        self.peak_vel_g = max(self.peak_vel_g, abs(self.current_vel)) # Lacak puncak PGV
+
+                        #integrasi PGD
+                        self.current_disp += self.current_vel * self.DT
+                        self.peak_disp_g = max(self.peak_disp_g, abs(self.current_disp)) # Lacak puncak PGD
+
+                        self.pga_counter += 1
+
+                        if self.pga_counter >= self.pga_window_size:
+
+                            self.current_mmi = self.calculate_mmi(self.peak_pga_window)
+                            if self.pga_label:
+                                self.pga_label.setText(f"{self.peak_pga_window:.4f} {self.pga_unit_label}")
+                            if self.pgv_label:
+                                self.pgv_label.setText(f"{self.peak_vel_g:.4f} {self.pgv_unit_label}")
+                            if self.pgd_label:
+                                self.pgd_label.setText(f"{self.peak_disp_g:.4f} {self.pgd_unit_label}")
+                            if self.mmi_label:
+                                self.mmi_label.setText(f"{self.current_mmi:.1f} MMI")
+
+                            # Reset Nilai Puncak dan Integrasi 
+                            self.peak_pga_window = 0.0
+                            self.peak_vel_g = 0.0
+                            self.peak_disp_g = 0.0
+
+                            # Penting: Reset juga integrasi untuk menghindari drift permanen 
+                            self.current_vel = 0.0
+                            self.current_disp = 0.0
+                            self.pga_counter = 0
+
+                    except ValueError:
+                        print(f"Data tidak valid (bukan angka) diterima: {line}")
+                    except Exception as e:
+                        print(f"Error saat memproses data: {e}")
+                else:
+                    print(f"Format data tidak valid: {line}. Diharapkan 5 nilai dipisahkan koma (Ax,Ay,RollAngle,PitchAngle,Az).")
+
+
+    def closeEvent(self, event):
+        """Cleanup saat aplikasi ditutup"""
+        self.running = False
+        if self.wifi_socket:
             try:
-                 while self.serial_connection.in_waiting > 0:
-                    line = self.serial_connection.readline().decode('utf-8').strip()
-
-                    if line:
-                        data_parts = line.split(',')
-
-
-                        if len(data_parts) == 5:
-
-                            try:
-                                new_roll_accel = float(data_parts[0])    # Data 1: Ax
-                                new_pitch_accel = float(data_parts[1])   # Data 2: Ay
-                                new_roll_angle = float(data_parts[2])    # Data 3: Roll Angle
-                                new_pitch_angle = float(data_parts[3])   # Data 4: Pitch Angle
-                                new_yaw_accel = float(data_parts[4])   # Data 5: Az
-
-                                detrended_yaw_accel = new_yaw_accel - self.STATIC_BIAS
-
-
-
-                                # Update data
-
-
-                                # 1. Roll Accel
-                                self.roll_data[:-1] = self.roll_data[1:]
-                                self.roll_data[-1] = new_roll_accel
-
-                                # 2. Pitch Accel
-                                self.pitch_data[:-1] = self.pitch_data[1:]
-                                self.pitch_data[-1] = new_pitch_accel
-
-                                # 3. Roll Angle
-                                self.roll_angle_data[:-1] = self.roll_angle_data[1:]
-                                self.roll_angle_data[-1] = new_roll_angle
-
-                                # 4. Pitch Angle
-                                self.pitch_angle_data[:-1] = self.pitch_angle_data[1:]
-                                self.pitch_angle_data[-1] = new_pitch_angle
-
-                                # 5. Yaw Accel
-                                self.yaw_data[:-1] = self.yaw_data[1:]
-                                self.yaw_data[-1] = detrended_yaw_accel
-
-
-
-                                self.rollacc_curve.setData(self.time_data, self.roll_data)
-                                self.pitchacc_curve.setData(self.time_data, self.pitch_data)
-                                self.rollangle_curve.setData(self.time_data, self.roll_angle_data)
-                                self.pitchangle_curve.setData(self.time_data, self.pitch_angle_data)
-                                self.yawacc_curve.setData(self.time_data, self.yaw_data)
-
-
-
-
-                                total_acc = math.sqrt(new_roll_accel**2 + new_pitch_accel**2 + new_yaw_accel**2)
-                                ground_accel = abs(total_acc - 1.0)
-
-
-                                self.peak_pga_window = max(self.peak_pga_window, ground_accel)
-
-                                #integrasi PGV
-                                self.current_vel += ground_accel * self.DT
-                                self.peak_vel_g = max(self.peak_vel_g, abs(self.current_vel)) # Lacak puncak PGV
-
-                                #integrasi PGD
-                                self.current_disp += self.current_vel * self.DT
-                                self.peak_disp_g = max(self.peak_disp_g, abs(self.current_disp)) # Lacak puncak PGD
-
-
-                                self.pga_counter += 1
-
-
-                                if self.pga_counter >= self.pga_window_size:
-
-                                    self.current_mmi = self.calculate_mmi(self.peak_pga_window)
-                                    if self.pga_label:
-
-
-                                        self.pga_label.setText(f"{self.peak_pga_window:.4f} {self.pga_unit_label}")
-                                    if self.pgv_label:
-                                        self.pgv_label.setText(f"{self.peak_vel_g:.4f} {self.pgv_unit_label}")
-                                    if self.pgd_label:
-                                        self.pgd_label.setText(f"{self.peak_disp_g:.4f} {self.pgd_unit_label}")
-                                    if self.mmi_label:
-                                        self.mmi_label.setText(f"{self.current_mmi:.1f} MMI")
-
-                                           
-                                    # Reset Nilai Puncak dan Integrasi 
-
-                                    self.peak_pga_window = 0.0
-                                    self.peak_vel_g = 0.0
-                                    self.peak_disp_g = 0.0
-
-                                   
-                                    # Penting: Reset juga integrasi untuk menghindari drift permanen 
-                                    self.current_vel = 0.0
-                                    self.current_disp = 0.0
-                                    self.pga_counter = 0
-
-
-
-                            except ValueError:
-                                print(f"Data serial tidak valid (bukan angka) diterima: {line}")
-                            except Exception as e:
-                                print(f"Error saat memproses data: {e}")
-                        else:
-                            print(f"Format data serial tidak valid: {line}. Diharapkan 4 nilai dipisahkan koma (Ax,Ay,RollAngle,PitchAngle).")
-
-            except Exception as e:
-                print(f"Error saat membaca/memproses serial: {e}")
-                if self.serial_connection and self.serial_connection.isOpen():
-                    self.serial_connection.close()
-                self.serial_connection = None
+                self.wifi_socket.close()
+            except:
+                pass
+        event.accept()
 
 
 if __name__ == "__main__":

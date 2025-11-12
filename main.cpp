@@ -3,7 +3,14 @@
 #include <MPU6050.h>
 #include <LiquidCrystal.h>
 #include <math.h>
+#include "BluetoothSerial.h"
 
+// Cek apakah Bluetooth tersedia
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
+#endif
+
+BluetoothSerial SerialBT;
 LiquidCrystal lcd(14, 27, 26, 25, 33, 32);
 
 MPU6050 mpu;            // Object sensor MPU6050
@@ -28,6 +35,11 @@ void processCommand(String command);
 
 void setup() {
   Serial.begin(115200);
+  
+  // Inisialisasi Bluetooth Serial
+  SerialBT.begin("ESP32_Seismograph"); // Nama Bluetooth device
+  Serial.println("Bluetooth Device is ready to pair");
+  
   Wire.begin();
   delay(100);
   mpu.initialize();
@@ -49,19 +61,20 @@ void setup() {
   lcd.print("Initializing...");
   delay(1000);
 
-
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("MPU Ready");
-  delay(1000);
+  lcd.print("BT: ESP32_Seis");
+  lcd.setCursor(0, 1);
+  lcd.print("Ready to pair");
+  delay(2000);
   lcd.clear();
 }
 
 void loop() {
 
-  // Cek apakah ada perintah dari serial (dari UI Python)
-  while (Serial.available() > 0) {
-    char inChar = (char)Serial.read();
+  // Cek apakah ada perintah dari Bluetooth (dari UI Python)
+  while (SerialBT.available() > 0) {
+    char inChar = (char)SerialBT.read();
     
     if (inChar == '\n') {
       // Proses perintah yang diterima
@@ -85,7 +98,18 @@ void loop() {
 
   float magnitude = sqrt(Ax * Ax + Ay * Ay + Az * Az);
 
-
+  // Kirim data ke Bluetooth dan Serial Monitor
+  SerialBT.print(Ax, 3);
+  SerialBT.print(",");
+  SerialBT.print(Ay, 3);
+  SerialBT.print(",");
+  SerialBT.print(RollAngle, 2);
+  SerialBT.print(",");
+  SerialBT.print(PitchAngle, 2);
+  SerialBT.print(",");
+  SerialBT.println(Az, 2);
+  
+  // Debug ke Serial Monitor (opsional)
   Serial.print(Ax, 3);
   Serial.print(",");
   Serial.print(Ay, 3);
@@ -144,20 +168,27 @@ void processCommand(String command) {
       switch(buzzerNum) {
         case 1:
           digitalWrite(buzzer1Pin, state == 1 ? HIGH : LOW);
+          SerialBT.print("Buzzer 1 ");
+          SerialBT.println(state == 1 ? "ON" : "OFF");
           Serial.print("Buzzer 1 ");
           Serial.println(state == 1 ? "ON" : "OFF");
           break;
         case 2:
           digitalWrite(buzzer2Pin, state == 1 ? HIGH : LOW);
+          SerialBT.print("Buzzer 2 ");
+          SerialBT.println(state == 1 ? "ON" : "OFF");
           Serial.print("Buzzer 2 ");
           Serial.println(state == 1 ? "ON" : "OFF");
           break;
         case 3:
           digitalWrite(buzzer3Pin, state == 1 ? HIGH : LOW);
+          SerialBT.print("Buzzer 3 ");
+          SerialBT.println(state == 1 ? "ON" : "OFF");
           Serial.print("Buzzer 3 ");
           Serial.println(state == 1 ? "ON" : "OFF");
           break;
         default:
+          SerialBT.println("Error: Buzzer number invalid");
           Serial.println("Error: Buzzer number invalid");
           break;
       }

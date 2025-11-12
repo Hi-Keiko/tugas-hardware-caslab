@@ -10,7 +10,7 @@ from PyQt5.QtGui import QFont, QPixmap
 from PyQt5 import QtCore
 
 import pyqtgraph as pg
-import serial
+import paho.mqtt.client as mqtt
 import time
 
 from Resource import rscseis
@@ -23,10 +23,17 @@ class Dashboard(QMainWindow):
         loadUi("seismograph.ui", self)
         self.showMaximized()
 
-
-        self.SERIAL_PORT = 'COM10'  
-        self.BAUD_RATE = 115200
-        self.serial_connection = None
+        # ===== KONFIGURASI MQTT =====
+        self.MQTT_BROKER = "broker.emqx.io"
+        self.MQTT_PORT = 1883
+        self.MQTT_TOPIC_DATA = "seismograph/data"       # Topic untuk menerima data sensor
+        self.MQTT_TOPIC_BUZZER = "seismograph/buzzer"   # Topic untuk mengirim perintah buzzer
+        self.MQTT_USERNAME = "emqx"
+        self.MQTT_PASSWORD = "public"
+        
+        # MQTT Client
+        self.mqtt_client = None
+        self.mqtt_connected = False
 
 
         self.MAX_POINTS = 500  # Maksimum titik yang ditampilkan pada grafik
@@ -223,7 +230,7 @@ class Dashboard(QMainWindow):
         # Setup buzzer control buttons
         self.setup_buzzer_controls()
 
-        self.setup_serial()
+        self.setup_mqtt()
 
 
         self.timer = QtCore.QTimer()
@@ -233,27 +240,157 @@ class Dashboard(QMainWindow):
 
 
 
-    def setup_serial(self):
-
-        #Koneksi port ke serial
+    def setup_mqtt(self):
+        """Setup MQTT client dan koneksi ke broker"""
         try:
-            self.serial_connection = serial.Serial(
-                self.SERIAL_PORT,
-                self.BAUD_RATE,
-                timeout=0.1 # Non-blocking read (waktu tunggu sangat singkat)
-            )
-            print(f"Koneksi serial berhasil di {self.SERIAL_PORT} @ {self.BAUD_RATE} bps")
-        except serial.SerialException as e:
-            print(f"Gagal membuka port serial {self.SERIAL_PORT}: {e}")
-            self.serial_connection = None
-            # Tampilkan pesan error ke pengguna
-
+            # Buat MQTT client dengan client ID unik
+            client_id = f'python-seismograph-{int(time.time())}'
+            self.mqtt_client = mqtt.Client(client_id)
+            
+            # Set username dan password (opsional untuk broker publik)
+            self.mqtt_client.username_pw_set(self.MQTT_USERNAME, self.MQTT_PASSWORD)
+            
+            # Set callback functions
+            self.mqtt_client.on_connect = self.on_mqtt_connect
+            self.mqtt_client.on_message = self.on_mqtt_message
+            self.mqtt_client.on_disconnect = self.on_mqtt_disconnect
+            
+            # Connect ke broker
+            print(f"Connecting to MQTT broker: {self.MQTT_BROKER}:{self.MQTT_PORT}")
+            self.mqtt_client.connect(self.MQTT_BROKER, self.MQTT_PORT, 60)
+            
+            # Start loop di background thread
+            self.mqtt_client.loop_start()
+            
+        except Exception as e:
+            print(f"Error setting up MQTT: {e}")
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Critical)
-            msg.setText("Gagal Koneksi Serial")
-            msg.setInformativeText(f"Pastikan perangkat terhubung dan port '{self.SERIAL_PORT}' benar.\nError: {e}")
-            msg.setWindowTitle("Error Serial")
+            msg.setText("Gagal Setup MQTT")
+            msg.setInformativeText(f"Error: {e}\n\nPastikan koneksi internet Anda aktif.")
+            msg.setWindowTitle("Error MQTT")
             msg.exec_()
+    
+    
+    def on_mqtt_connect(self, client, userdata, flags, rc):
+        """Callback ketika berhasil connect ke MQTT broker"""
+        if rc == 0:
+            print("Connected to MQTT Broker!")
+            self.mqtt_connected = True
+            
+            # Subscribe ke topic data dari ESP32
+            client.subscribe(self.MQTT_TOPIC_DATA)
+            print(f"Subscribed to topic: {self.MQTT_TOPIC_DATA}")
+            
+        else:
+            print(f"Failed to connect to MQTT Broker, return code {rc}")
+            self.mqtt_connected = False
+    
+    
+    def on_mqtt_disconnect(self, client, userdata, rc):
+        """Callback ketika disconnect dari MQTT broker"""
+        print("Disconnected from MQTT Broker")
+        self.mqtt_connected = False
+        if rc != 0:
+            print("Unexpected disconnection. Reconnecting...")
+    
+    
+    def on_mqtt_message(self, client, userdata, msg):
+        """Callback ketika menerima pesan MQTT"""
+        try:
+            # Decode payload
+            payload = msg.payload.decode('utf-8').strip()
+            
+            # Process data jika dari topic data
+            if msg.topic == self.MQTT_TOPIC_DATA:
+                self.process_sensor_data(payload)
+                
+        except Exception as e:
+            print(f"Error processing MQTT message: {e}")
+    
+    
+    def process_sensor_data(self, data_string):
+        """Memproses data sensor yang diterima dari ESP32"""
+        try:
+            data_parts = data_string.split(',')
+            
+            if len(data_parts) == 5:
+                new_roll_accel = float(data_parts[0])    # Data 1: Ax
+                new_pitch_accel = float(data_parts[1])   # Data 2: Ay
+                new_roll_angle = float(data_parts[2])    # Data 3: Roll Angle
+                new_pitch_angle = float(data_parts[3])   # Data 4: Pitch Angle
+                new_yaw_accel = float(data_parts[4])     # Data 5: Az
+
+                detrended_yaw_accel = new_yaw_accel - self.STATIC_BIAS
+
+                # Update data
+                # 1. Roll Accel
+                self.roll_data[:-1] = self.roll_data[1:]
+                self.roll_data[-1] = new_roll_accel
+
+                # 2. Pitch Accel
+                self.pitch_data[:-1] = self.pitch_data[1:]
+                self.pitch_data[-1] = new_pitch_accel
+
+                # 3. Roll Angle
+                self.roll_angle_data[:-1] = self.roll_angle_data[1:]
+                self.roll_angle_data[-1] = new_roll_angle
+
+                # 4. Pitch Angle
+                self.pitch_angle_data[:-1] = self.pitch_angle_data[1:]
+                self.pitch_angle_data[-1] = new_pitch_angle
+
+                # 5. Yaw Accel
+                self.yaw_data[:-1] = self.yaw_data[1:]
+                self.yaw_data[-1] = detrended_yaw_accel
+
+                # Update grafik
+                self.rollacc_curve.setData(self.time_data, self.roll_data)
+                self.pitchacc_curve.setData(self.time_data, self.pitch_data)
+                self.rollangle_curve.setData(self.time_data, self.roll_angle_data)
+                self.pitchangle_curve.setData(self.time_data, self.pitch_angle_data)
+                self.yawacc_curve.setData(self.time_data, self.yaw_data)
+
+                # Hitung PGA, PGV, PGD
+                total_acc = math.sqrt(new_roll_accel**2 + new_pitch_accel**2 + new_yaw_accel**2)
+                ground_accel = abs(total_acc - 1.0)
+
+                self.peak_pga_window = max(self.peak_pga_window, ground_accel)
+
+                # Integrasi PGV
+                self.current_vel += ground_accel * self.DT
+                self.peak_vel_g = max(self.peak_vel_g, abs(self.current_vel))
+
+                # Integrasi PGD
+                self.current_disp += self.current_vel * self.DT
+                self.peak_disp_g = max(self.peak_disp_g, abs(self.current_disp))
+
+                self.pga_counter += 1
+
+                if self.pga_counter >= self.pga_window_size:
+                    self.current_mmi = self.calculate_mmi(self.peak_pga_window)
+                    
+                    if self.pga_label:
+                        self.pga_label.setText(f"{self.peak_pga_window:.4f} {self.pga_unit_label}")
+                    if self.pgv_label:
+                        self.pgv_label.setText(f"{self.peak_vel_g:.4f} {self.pgv_unit_label}")
+                    if self.pgd_label:
+                        self.pgd_label.setText(f"{self.peak_disp_g:.4f} {self.pgd_unit_label}")
+                    if self.mmi_label:
+                        self.mmi_label.setText(f"{self.current_mmi:.1f} MMI")
+
+                    # Reset Nilai Puncak dan Integrasi
+                    self.peak_pga_window = 0.0
+                    self.peak_vel_g = 0.0
+                    self.peak_disp_g = 0.0
+                    self.current_vel = 0.0
+                    self.current_disp = 0.0
+                    self.pga_counter = 0
+
+        except ValueError:
+            print(f"Data tidak valid diterima: {data_string}")
+        except Exception as e:
+            print(f"Error saat memproses data sensor: {e}")
 
 
     def setup_buzzer_controls(self):
@@ -289,15 +426,15 @@ class Dashboard(QMainWindow):
 
     def control_buzzer(self, buzzer_num, state):
         """
-        Mengirim perintah untuk mengontrol buzzer ke ESP
+        Mengirim perintah untuk mengontrol buzzer ke ESP via MQTT
         buzzer_num: 1, 2, atau 3
         state: True (ON) atau False (OFF)
         """
-        if not self.serial_connection or not self.serial_connection.isOpen():
+        if not self.mqtt_connected:
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Warning)
-            msg.setText("Koneksi Serial Tidak Tersedia")
-            msg.setInformativeText("Pastikan ESP terhubung dan koneksi serial aktif.")
+            msg.setText("MQTT Tidak Terhubung")
+            msg.setInformativeText("Pastikan ESP32 terhubung ke WiFi dan broker MQTT aktif.")
             msg.setWindowTitle("Peringatan")
             msg.exec_()
             return
@@ -305,11 +442,16 @@ class Dashboard(QMainWindow):
         try:
             # Format perintah: BUZ<nomor>,<state>
             # Contoh: BUZ1,1 (buzzer 1 ON), BUZ2,0 (buzzer 2 OFF)
-            command = f"BUZ{buzzer_num},{1 if state else 0}\n"
-            self.serial_connection.write(command.encode('utf-8'))
+            command = f"BUZ{buzzer_num},{1 if state else 0}"
+            
+            # Publish perintah ke topic buzzer
+            result = self.mqtt_client.publish(self.MQTT_TOPIC_BUZZER, command)
             
             status_text = "ON" if state else "OFF"
-            print(f"Perintah dikirim: Buzzer {buzzer_num} -> {status_text}")
+            print(f"Perintah dikirim via MQTT: Buzzer {buzzer_num} -> {status_text}")
+            
+            if result.rc != mqtt.MQTT_ERR_SUCCESS:
+                print(f"Failed to publish message, error code: {result.rc}")
             
         except Exception as e:
             print(f"Error saat mengirim perintah buzzer: {e}")
@@ -351,122 +493,10 @@ class Dashboard(QMainWindow):
        
 
     def update_plot(self):
-        #untuk updating plot
-        if self.serial_connection and self.serial_connection.isOpen():
-            try:
-                 while self.serial_connection.in_waiting > 0:
-                    line = self.serial_connection.readline().decode('utf-8').strip()
-
-                    if line:
-                        data_parts = line.split(',')
-
-
-                        if len(data_parts) == 5:
-
-                            try:
-                                new_roll_accel = float(data_parts[0])    # Data 1: Ax
-                                new_pitch_accel = float(data_parts[1])   # Data 2: Ay
-                                new_roll_angle = float(data_parts[2])    # Data 3: Roll Angle
-                                new_pitch_angle = float(data_parts[3])   # Data 4: Pitch Angle
-                                new_yaw_accel = float(data_parts[4])   # Data 5: Az
-
-                                detrended_yaw_accel = new_yaw_accel - self.STATIC_BIAS
-
-
-
-                                # Update data
-
-
-                                # 1. Roll Accel
-                                self.roll_data[:-1] = self.roll_data[1:]
-                                self.roll_data[-1] = new_roll_accel
-
-                                # 2. Pitch Accel
-                                self.pitch_data[:-1] = self.pitch_data[1:]
-                                self.pitch_data[-1] = new_pitch_accel
-
-                                # 3. Roll Angle
-                                self.roll_angle_data[:-1] = self.roll_angle_data[1:]
-                                self.roll_angle_data[-1] = new_roll_angle
-
-                                # 4. Pitch Angle
-                                self.pitch_angle_data[:-1] = self.pitch_angle_data[1:]
-                                self.pitch_angle_data[-1] = new_pitch_angle
-
-                                # 5. Yaw Accel
-                                self.yaw_data[:-1] = self.yaw_data[1:]
-                                self.yaw_data[-1] = detrended_yaw_accel
-
-
-
-                                self.rollacc_curve.setData(self.time_data, self.roll_data)
-                                self.pitchacc_curve.setData(self.time_data, self.pitch_data)
-                                self.rollangle_curve.setData(self.time_data, self.roll_angle_data)
-                                self.pitchangle_curve.setData(self.time_data, self.pitch_angle_data)
-                                self.yawacc_curve.setData(self.time_data, self.yaw_data)
-
-
-
-
-                                total_acc = math.sqrt(new_roll_accel**2 + new_pitch_accel**2 + new_yaw_accel**2)
-                                ground_accel = abs(total_acc - 1.0)
-
-
-                                self.peak_pga_window = max(self.peak_pga_window, ground_accel)
-
-                                #integrasi PGV
-                                self.current_vel += ground_accel * self.DT
-                                self.peak_vel_g = max(self.peak_vel_g, abs(self.current_vel)) # Lacak puncak PGV
-
-                                #integrasi PGD
-                                self.current_disp += self.current_vel * self.DT
-                                self.peak_disp_g = max(self.peak_disp_g, abs(self.current_disp)) # Lacak puncak PGD
-
-
-                                self.pga_counter += 1
-
-
-                                if self.pga_counter >= self.pga_window_size:
-
-                                    self.current_mmi = self.calculate_mmi(self.peak_pga_window)
-                                    if self.pga_label:
-
-
-                                        self.pga_label.setText(f"{self.peak_pga_window:.4f} {self.pga_unit_label}")
-                                    if self.pgv_label:
-                                        self.pgv_label.setText(f"{self.peak_vel_g:.4f} {self.pgv_unit_label}")
-                                    if self.pgd_label:
-                                        self.pgd_label.setText(f"{self.peak_disp_g:.4f} {self.pgd_unit_label}")
-                                    if self.mmi_label:
-                                        self.mmi_label.setText(f"{self.current_mmi:.1f} MMI")
-
-                                           
-                                    # Reset Nilai Puncak dan Integrasi 
-
-                                    self.peak_pga_window = 0.0
-                                    self.peak_vel_g = 0.0
-                                    self.peak_disp_g = 0.0
-
-                                   
-                                    # Penting: Reset juga integrasi untuk menghindari drift permanen 
-                                    self.current_vel = 0.0
-                                    self.current_disp = 0.0
-                                    self.pga_counter = 0
-
-
-
-                            except ValueError:
-                                print(f"Data serial tidak valid (bukan angka) diterima: {line}")
-                            except Exception as e:
-                                print(f"Error saat memproses data: {e}")
-                        else:
-                            print(f"Format data serial tidak valid: {line}. Diharapkan 4 nilai dipisahkan koma (Ax,Ay,RollAngle,PitchAngle).")
-
-            except Exception as e:
-                print(f"Error saat membaca/memproses serial: {e}")
-                if self.serial_connection and self.serial_connection.isOpen():
-                    self.serial_connection.close()
-                self.serial_connection = None
+        """Update plot - data sudah diproses di on_mqtt_message"""
+        # Fungsi ini sekarang hanya untuk menjaga timer tetap berjalan
+        # Data diupdate secara real-time melalui callback MQTT
+        pass
 
 
 if __name__ == "__main__":

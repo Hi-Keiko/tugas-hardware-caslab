@@ -23,8 +23,25 @@ class Dashboard(QMainWindow):
         loadUi("seismograph.ui", self)
         self.showMaximized()
 
-
-        self.SERIAL_PORT = 'COM10'  
+        # KONFIGURASI KONEKSI
+        # Untuk Bluetooth: Ganti dengan address Bluetooth ESP32 Anda
+        # Format macOS: '/dev/tty.ESP32_Seismograph'
+        # Format Windows: 'COM10' (atau port Bluetooth yang ter-assign)
+        # Format Linux: '/dev/rfcomm0' atau cari dengan 'hcitool scan'
+        
+        self.USE_BLUETOOTH = True  # Set True untuk Bluetooth, False untuk USB Serial
+        
+        if self.USE_BLUETOOTH:
+            # Untuk macOS
+            self.SERIAL_PORT = '/dev/tty.ESP32_Seismograph'
+            # Untuk Windows, gunakan port COM yang ter-assign setelah pairing
+            # self.SERIAL_PORT = 'COM10'
+            # Untuk Linux
+            # self.SERIAL_PORT = '/dev/rfcomm0'
+        else:
+            # Untuk USB Serial
+            self.SERIAL_PORT = 'COM10'
+            
         self.BAUD_RATE = 115200
         self.serial_connection = None
 
@@ -235,14 +252,15 @@ class Dashboard(QMainWindow):
 
     def setup_serial(self):
 
-        #Koneksi port ke serial
+        #Koneksi port ke serial/Bluetooth
         try:
             self.serial_connection = serial.Serial(
                 self.SERIAL_PORT,
                 self.BAUD_RATE,
                 timeout=0.1 # Non-blocking read (waktu tunggu sangat singkat)
             )
-            print(f"Koneksi serial berhasil di {self.SERIAL_PORT} @ {self.BAUD_RATE} bps")
+            connection_type = "Bluetooth" if self.USE_BLUETOOTH else "USB Serial"
+            print(f"Koneksi {connection_type} berhasil di {self.SERIAL_PORT} @ {self.BAUD_RATE} bps")
         except serial.SerialException as e:
             print(f"Gagal membuka port serial {self.SERIAL_PORT}: {e}")
             self.serial_connection = None
@@ -250,10 +268,11 @@ class Dashboard(QMainWindow):
 
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Critical)
-            msg.setText("Gagal Koneksi Serial")
-            msg.setInformativeText(f"Pastikan perangkat terhubung dan port '{self.SERIAL_PORT}' benar.\nError: {e}")
-            msg.setWindowTitle("Error Serial")
+            msg.setText("Gagal Koneksi Serial/Bluetooth")
+            msg.setInformativeText(f"Pastikan perangkat terhubung dan port '{self.SERIAL_PORT}' benar.\n\nUntuk Bluetooth:\n- Pastikan ESP32 sudah di-pairing\n- Periksa nama port Bluetooth\n- macOS: /dev/tty.ESP32_Seismograph\n- Windows: COM port yang ter-assign\n- Linux: /dev/rfcomm0\n\nError: {e}")
+            msg.setWindowTitle("Error Koneksi")
             msg.exec_()
+
 
 
     def setup_buzzer_controls(self):

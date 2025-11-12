@@ -3,7 +3,7 @@
 #include <MPU6050.h>
 #include <LiquidCrystal.h>
 #include <math.h>
-#include "BluetoothSerial.h"
+#include <BluetoothSerial.h>
 
 // Cek apakah Bluetooth tersedia
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)

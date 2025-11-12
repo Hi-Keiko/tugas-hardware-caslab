@@ -23,6 +23,9 @@ float alpha = 0.1;
 // Buffer untuk membaca perintah serial
 String serialCommand = "";
 
+// Deklarasi fungsi
+void processCommand(String command);
+
 void setup() {
   Serial.begin(115200);
   Wire.begin();
